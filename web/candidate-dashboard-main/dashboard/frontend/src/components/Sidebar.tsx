@@ -1,42 +1,37 @@
-import { LayoutDashboard, RefreshCw, Settings } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
+import { RefreshCw, Settings, Trophy, Users } from "lucide-react";
+import SettingsModal from "./SettingsModal";
 
 type Props = {
-  onRefreshRequested?: () => void;
+  onRefreshRequested: () => void;
+  onViewChange: (view: string) => void;
+  currentView: string;
 };
 
-export default function Sidebar({ onRefreshRequested }: Props) {
+export default function Sidebar({ onRefreshRequested, onViewChange, currentView }: Props) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
-    <aside className="w-64 shrink-0 border-r border-slate-800 bg-slate-950/60">
-      <div className="p-5">
-        <div className="text-lg font-semibold tracking-tight">
-          Оценка кандидатов
-        </div>
-        <div className="mt-1 text-xs text-slate-400">
-          Telegram bot | FastAPI | Dashboard
-        </div>
-      </div>
-
-      <nav className="px-3 pb-4">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-slate-200 hover:bg-slate-800/60">
-          <LayoutDashboard size={18} />
-          Дашборд
-        </button>
-
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-slate-200 hover:bg-slate-800/60">
-          <Settings size={18} />
-          Настройки
-        </button>
-
-        <button
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-slate-200 hover:bg-slate-800/60"
-          onClick={onRefreshRequested}
-        >
-          <RefreshCw size={18} />
-          Обновить данные
-        </button>
-      </nav>
-    </aside>
+    <>
+      <aside className="w-64 border-r bg-white dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 h-screen flex flex-col">
+        <div className="p-5 font-bold text-lg">Оценка кандидатов</div>
+        <nav className="flex-1 px-3 space-y-1">
+          <button onClick={() => onViewChange("dashboard")} className={`flex w-full items-center gap-3 px-3 py-2 rounded-lg ${currentView === "dashboard" ? "bg-indigo-50 text-indigo-600 font-bold" : "text-slate-600"}`}>
+            <Users size={18} /> Дашборд
+          </button>
+          <button onClick={() => onViewChange("rating")} className={`flex w-full items-center gap-3 px-3 py-2 rounded-lg ${currentView === "rating" ? "bg-yellow-50 text-yellow-600 font-bold" : "text-slate-600"}`}>
+            <Trophy size={18} /> Рейтинг
+          </button>
+          <hr className="my-4" />
+          <button onClick={() => setSettingsOpen(true)} className="flex w-full items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg">
+            <Settings size={18} /> Настройки
+          </button>
+          <button onClick={onRefreshRequested} className="flex w-full items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg">
+            <RefreshCw size={18} /> Обновить данные
+          </button>
+        </nav>
+      </aside>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </>
   );
 }
-

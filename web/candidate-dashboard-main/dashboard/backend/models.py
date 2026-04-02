@@ -3,7 +3,7 @@ import datetime as dt
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
+from database import Base
 
 
 class Candidate(Base):

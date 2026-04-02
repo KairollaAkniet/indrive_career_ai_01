@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 
-from .database import SessionLocal
-from .models import Candidate
+from database import SessionLocal
+from models import Candidate
 
 
 def seed_candidates() -> int:

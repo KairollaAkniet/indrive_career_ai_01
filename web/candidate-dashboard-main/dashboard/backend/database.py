@@ -22,7 +22,10 @@ Base = declarative_base()
 def init_db() -> None:
     """Создаёт таблицы, если их ещё нет."""
     # Импорт Base гарантирует, что модели зарегистрированы в метаданных.
-    from . import models  # noqa: F401
+    import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+
+from models import Base
+Base.metadata.create_all(bind=engine)
 
