@@ -23,7 +23,7 @@ class CandidateOut(BaseModel):
     answers_text: str
     ai_score: int
     ai_summary: str | None
-    ai_probability: int = 0  # 👈 Осы жолдың бар екеніне көз жеткіз
+    ai_probability: int = 0
     created_at: datetime
 
     class Config:

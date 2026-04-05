@@ -16,8 +16,7 @@ export default function StatsCards({ candidates, loading }: Props) {
   const total = candidates.length;
   const scoreSum = candidates.reduce((acc, c) => acc + (c.ai_score ?? 0), 0);
 
-  // "Ожидают проверки" — кандидаты между низким и высоким порогом.
-  // (Можно поменять правило под вашу бизнес-логику.)
+
   const pending = candidates.filter((c) => c.ai_score >= 50 && c.ai_score <= 80).length;
   const avg = formatAvg(scoreSum, total);
 

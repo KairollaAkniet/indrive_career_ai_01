@@ -46,7 +46,6 @@ export default function CandidatesTable({
 
         <button
           onClick={onRefresh}
-          // disable, пока идёт загрузка, чтобы не дублировать запросы
           className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 hover:bg-slate-900"
           disabled={loading}
           type="button"

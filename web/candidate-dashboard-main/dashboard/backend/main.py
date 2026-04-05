@@ -9,7 +9,6 @@ from schemas import BotDataIn, CandidateOut, CandidatesListOut
 
 app = FastAPI()
 
-# CORS баптаулары (Фронтенд қосылуы үшін)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,8 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Мәліметтер базасымен байланыс функциясы
 def get_db():
     db = SessionLocal()
     try:
@@ -34,12 +31,10 @@ def post_bot_data(payload: BotDataIn):
     Телеграм боттан келген деректерді қабылдау және сақтау.
     """
     with SessionLocal() as db:
-        # Пайдаланушының бұрын тіркелгенін тексереміз
         stmt = select(Candidate).where(Candidate.user_id == payload.user_id)
         candidate = db.scalar(stmt)
 
         if candidate is None:
-            # Жаңа кандидат жасау (ai_probability қосылды)
             candidate = Candidate(
                 user_id=payload.user_id,
                 username=payload.username,
@@ -47,11 +42,11 @@ def post_bot_data(payload: BotDataIn):
                 answers_text=payload.answers_text,
                 ai_score=payload.ai_score,
                 ai_summary=payload.ai_summary,
-                ai_probability=payload.ai_probability  # Схемадан келетін мән
+                ai_probability=payload.ai_probability
             )
             db.add(candidate)
         else:
-            # Бар кандидаттың деректерін жаңарту
+
             candidate.username = payload.username
             candidate.full_name = payload.full_name
             candidate.answers_text = payload.answers_text

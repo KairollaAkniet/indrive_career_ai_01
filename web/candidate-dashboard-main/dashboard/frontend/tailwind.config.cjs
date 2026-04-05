@@ -14,7 +14,7 @@ module.exports = {
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: "class", // ОСЫ ЖОЛДЫҢ БАР ЕКЕНІНЕ КӨЗ ЖЕТКІЗ!
+  darkMode: "class",
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",

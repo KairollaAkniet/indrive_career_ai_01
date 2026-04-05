@@ -5,15 +5,14 @@ from dotenv import load_dotenv
 import whisper
 import os
 
-# Модельді жүктейміз (бірінші рет қосқанда сәл уақыт алуы мүмкін)
+
 model = whisper.load_model("base")
 
 
 def convert_voice_to_text(file_path):
     """Whisper-ді қазақ/орыс тіліне баптау"""
     try:
-        # language="ru" немесе "kk" деп көрсету Whisper-ді адастырмайды
-        # Егер орысша сөйлесең "ru", қазақша болса "kk" қой
+
         result = model.transcribe(file_path, language="ru", task="transcribe", fp16=False)
 
         recognized_text = result["text"].strip()
@@ -26,7 +25,7 @@ load_dotenv()
 
 API_KEY = os.getenv("INDRIVE_API_KEY")
 URL = "https://llm.alem.ai/v1/chat/completions"
-# СЕНІҢ FastAPI БЭКЕНДІҢНІҢ АДРЕСІ:
+
 BACKEND_URL = "http://0.0.0.0:8000/api/bot-data"
 
 
@@ -42,15 +41,13 @@ def analyze_interview_answer(question, user_answer):
     2. Қандай қателер бар екенін айт.
     3. Дұрыс жауап қандай болуы керек екенін ҚАЗАҚ ТІЛІНДЕ түсіндір.
     """
-    # Осы жерде AlemLLM-ге сұраныс жіберу коды (analyze_candidate_score сияқты)
-    # ...
 
-# indrive_api.py файлына қосу:
+
+
+
 def transcribe_voice(file_path: str):
     """Дауыстық файлды Gemini арқылы мәтінге айналдыру"""
-    # Мұнда Gemini-дің мультимодальдік мүмкіндігін қолданамыз
-    # Әзірге біз AlemLLM қолданып жатқандықтан,
-    # дауысты мәтінге айналдыру үшін Gemini 1.5 Flash моделін қосқан тиімді.
+
     return "Пайдаланушының дауыстық жауабы (транскрипция сәтті өтті)"
 
 
@@ -91,7 +88,7 @@ def send_to_backend(user_id, username, full_name, text, score, summary):
         "username": username or "unknown",
         "full_name": full_name,
         "answers_text": text,
-        "ai_score": int(score * 100), # 0.85-ті 85-ке айналдырамыз
+        "ai_score": int(score * 100),
         "ai_summary": summary
     }
     try:

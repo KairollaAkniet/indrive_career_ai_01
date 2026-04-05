@@ -16,7 +16,7 @@ class Candidate(Base):
     ai_score: Mapped[int] = mapped_column(Integer, nullable=False)
     ai_summary: Mapped[str] = mapped_column(Text, nullable=True)
 
-    # Дұрыс жазылуы (пайызды сақтау үшін Float немесе Integer):
+
     ai_probability: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     created_at: Mapped[dt.datetime] = mapped_column(

@@ -1,11 +1,8 @@
 import sqlite3
-
-# Базаға қосылу
 conn = sqlite3.connect('candidates.db')
 cursor = conn.cursor()
 
 try:
-    # Жаңа бағанды қосу командасы
     cursor.execute("ALTER TABLE candidates ADD COLUMN ai_probability INTEGER DEFAULT 0")
     conn.commit()
     print("✅ ai_probability бағаны сәтті қосылды!")

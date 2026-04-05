@@ -1,87 +1,80 @@
 import asyncio
 import os
 import logging
-import random
 import requests
-import docx
-from aiogram import Bot, Dispatcher, types, F
+import sqlite3
+from docx import Document
+from aiogram import Bot, Dispatcher, types, F, Router
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
-
-# Өзіңнің файлдарың мен База импорты
-from indrive_api import analyze_candidate_score, convert_voice_to_text
-from database import init_db, update_user_info, get_user_mode, save_result
+try:
+    from indrive_api import analyze_candidate_score, convert_voice_to_text
+except ImportError:
+    logging.error("❌ indrive_api.py файлы табылмады!")
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# БЭКЕНД АДРЕСІ (Осыған назар аудар!)
 BACKEND_API = "http://192.168.8.230:8000/api/bot-data"
 DASHBOARD_URL = "http://192.168.8.230:5173"
 
+logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-logging.basicConfig(level=logging.INFO)
+router = Router()
+dp.include_router(router)
 
-# Базаны іске қосу
-init_db()
+def init_db():
+    conn = sqlite3.connect("bot_data.db")
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users 
+                      (user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT, 
+                       current_mode TEXT DEFAULT 'consultant')''')
+    conn.commit()
+    conn.close()
 
-CHALLENGES = [
-    "Challenge: Python-да 'list comprehension' қалай жұмыс істейді? Мысал келтір.",
-    "Challenge: Solana блокчейнінде 'Smart Contract' орнына не қолданылады?",
-    "Challenge: React-те 'Virtual DOM' не үшін керек?",
-    "Challenge: SQL-де 'JOIN' түрлерін түсіндіріп бер.",
-    "Challenge: AQUA-STEM жобаңда деректерді қалай сақтайсың?"
-]
-
-
-# --- КӨМЕКШІ ФУНКЦИЯЛАР ---
-
-def send_to_dashboard(user_id, username, full_name, text, score, summary, ai_probability):
-    """Деректерді FastAPI Backend-ке жіберу"""
-
-    # ҚАТЕНІ ТҮЗЕТУ: Саластырмалы сандарды бүтін санға (int) айналдырамыз
-    # Егер score 0.6 болса, ол 60 болады. ai_probability 0.13 болса, 13 болады.
-    fixed_score = int(score * 100) if score <= 1 else int(score)
-    fixed_ai_prob = int(ai_probability * 100) if ai_probability <= 1 else int(ai_probability)
-
-    payload = {
-        "user_id": int(user_id),
-        "username": str(username or "Unknown"),
-        "full_name": str(full_name or "Anonymous"),
-        "answers_text": str(text),
-        "ai_score": fixed_score,  # Енді бұл бүтін сан
-        "ai_summary": str(summary),
-        "ai_probability": fixed_ai_prob  # Енді бұл бүтін сан
-    }
-
-    try:
-        response = requests.post(BACKEND_API, json=payload, timeout=5)
-        if response.status_code == 200:
-            logging.info(f"✅ Dashboard-қа сәтті жіберілді: {response.status_code}")
-        else:
-            # Осы жерде бізге 422 қатесін көрсетіп тұрған болатын
-            logging.error(f"❌ Бэкенд қате қайтарды ({response.status_code}): {response.text}")
-    except Exception as e:
-        logging.error(f"❌ Dashboard-пен байланыс үзілді: {e}")
+def update_user_info(user_id, username, full_name):
+    conn = sqlite3.connect("bot_data.db")
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO users (user_id, username, full_name) VALUES (?, ?, ?)',
+                   (user_id, username, full_name))
+    conn.commit()
+    conn.close()
 
 def update_user_mode_in_db(user_id, mode):
-    import sqlite3
     conn = sqlite3.connect("bot_data.db")
     cursor = conn.cursor()
     cursor.execute('UPDATE users SET current_mode = ? WHERE user_id = ?', (mode, user_id))
     conn.commit()
     conn.close()
 
+def get_user_mode(user_id):
+    conn = sqlite3.connect("bot_data.db")
+    cursor = conn.cursor()
+    cursor.execute('SELECT current_mode FROM users WHERE user_id = ?', (user_id,))
+    data = cursor.fetchone()
+    conn.close()
+    return data[0] if data else "consultant"
+init_db()
 
-# --- МЕНЮЛАР ---
+class Interview(StatesGroup):
+    project = State()
+    tech_stack = State()
+    soft_skills = State()
+
+def get_dashboard_markup():
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🌐 Нәтижелерді сайттан көру", url=DASHBOARD_URL))
+    return builder.as_markup()
 
 def main_menu():
     builder = ReplyKeyboardBuilder()
-    builder.row(types.KeyboardButton(text="📱 Показать меню"))
+    builder.row(types.KeyboardButton(text="🚀 Сұхбатты бастау"))
+    builder.row(types.KeyboardButton(text="📱 Көрсету меню"))
     return builder.as_markup(resize_keyboard=True)
-
 
 def inline_menu():
     builder = InlineKeyboardBuilder()
@@ -93,96 +86,130 @@ def inline_menu():
     builder.row(types.InlineKeyboardButton(text="👤 Профиль", callback_data="mode_profile"))
     return builder.as_markup()
 
+def safe_analyze(text):
+    try:
+        ans = analyze_candidate_score(text)
+        if isinstance(ans, tuple) and len(ans) >= 2:
+            return ans[0], ans[1], (ans[2] if len(ans) > 2 else 0.1)
+    except:
+        pass
+    return 0.5, "Талдау қатесі", 0.1
 
-def get_dashboard_button():
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="📊 Толық нәтижені сайттан көру", url=DASHBOARD_URL))
-    return builder.as_markup()
+def send_to_dashboard(user_id, username, full_name, text, score, summary, prob):
+    try:
+        payload = {
+            "user_id": int(user_id), "username": str(username or "Unknown"),
+            "full_name": str(full_name or "Anonymous"), "answers_text": str(text),
+            "ai_score": int(score * 100) if score <= 1 else int(score),
+            "ai_summary": str(summary), "ai_probability": int(prob * 100)
+        }
+        requests.post(BACKEND_API, json=payload, timeout=5)
+    except:
+        pass
 
-
-# --- HANDLERS ---
-
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
+@router.message(Command("start"))
+async def cmd_start(message: Message):
     update_user_info(message.from_user.id, message.from_user.username, message.from_user.full_name)
-    await message.answer(f"Сәлем, {message.from_user.first_name}! 🚀\nМен InDrive AI ассистентімін.",
-                         reply_markup=main_menu())
+    await message.answer("Сәлем! Төмендегі менюден керекті бөлімді таңдаңыз 👇", reply_markup=main_menu())
 
-
-@dp.message(F.text == "📱 Показать меню")
-async def show_categories(message: types.Message):
+@router.message(F.text == "📱 Көрсету меню")
+async def show_all_modes(message: Message):
     await message.answer("🛠 Керекті функцияны таңдаңыз:", reply_markup=inline_menu())
 
-
-@dp.callback_query(F.data.startswith("mode_"))
-async def select_mode(callback: types.CallbackQuery):
-    mode = callback.data.split("_")[1]
-    user_id = callback.from_user.id
-
+@router.callback_query(F.data.startswith("mode_"))
+async def callbacks(c: types.CallbackQuery):
+    mode = c.data.split("_")[1]
     if mode == "profile":
-        import sqlite3
-        conn = sqlite3.connect("bot_data.db")
-        cursor = conn.cursor()
-        cursor.execute('SELECT last_score, total_tasks FROM users WHERE user_id = ?', (user_id,))
-        data = cursor.fetchone()
-        conn.close()
-        score = data[0] if data else 0.0
-        tasks = data[1] if data else 0
-        await callback.message.answer(
-            f"👤 Профиль: {callback.from_user.full_name}\n📊 Соңғы балл: {score}\n✅ Жұмыстар: {tasks}\n🎓 Оқу орны: AUES",
-            reply_markup=get_dashboard_button())
+        await c.message.answer(f"👤 Профиль: {c.from_user.full_name}\nID: {c.from_user.id}")
     else:
-        update_user_mode_in_db(user_id, mode)
-        msg = {
-            "mentor": f"🧠 AI Тапсырмасы:\n{random.choice(CHALLENGES)}\n\nЖауабыңызды жазыңыз.",
-            "consultant": "💬 Мен сенің Full Stack менторыңмын. Сұрағыңды қой.",
-            "audio": "🎤 Аудио-хабарлама жіберіңіз, мен оны талдаймын.",
-            "file": "📄 .docx файлын жіберіңіз (Lab жұмысы)."
-        }
-        await callback.message.answer(msg.get(mode, "Режим таңдалды."), reply_markup=get_dashboard_button())
-    await callback.answer()
+        update_user_mode_in_db(c.from_user.id, mode)
+        if mode == "mentor":
+            await c.message.answer("🧠 Mentor режимі қосылды. Тақырыпты жазыңыз, мен тек сұрақ қоямын.")
+        else:
+            await c.message.answer(f"✅ Режим қосылды: {mode.upper()}")
+    await c.answer()
 
+@router.message(F.text == "🚀 Сұхбатты бастау")
+async def start_interview(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("1/3: Қатысқан ең күрделі жобаңыз туралы айтыңыз?")
+    await state.set_state(Interview.project)
 
-@dp.message(F.text & ~F.status_updates)
-async def handle_text(message: types.Message):
-    if message.text == "📱 Показать меню": return
-    user_id = message.from_user.id
-    mode = get_user_mode(user_id)
+@router.message(Interview.project)
+async def step2(message: Message, state: FSMContext):
+    await state.update_data(p=message.text)
+    await message.answer("2/3: Технологиялық стегіңіз?")
+    await state.set_state(Interview.tech_stack)
 
-    status_msg = await message.answer("⏳ AI талдап жатыр...")
+@router.message(Interview.tech_stack)
+async def step3(message: Message, state: FSMContext):
+    await state.update_data(t=message.text)
+    await message.answer("3/3: Командадағы конфликтті қалай шешесіз?")
+    await state.set_state(Interview.soft_skills)
 
-    # Анализ жасау
-    analysis = analyze_candidate_score(message.text)
+@router.message(Interview.soft_skills)
+async def final_step(message: Message, state: FSMContext):
+    data = await state.get_data()
+    full_txt = f"Жоба: {data.get('p')}\nСтек: {data.get('t')}\nSoft: {message.text}"
+    msg = await message.answer("⏳ AI талдап жатыр...")
+    s, f, p = safe_analyze(full_txt)
+    send_to_dashboard(message.from_user.id, message.from_user.username, message.from_user.full_name, full_txt, s, f, p)
+    await msg.delete()
+    await message.answer(f"✅ Аяқталды!\n📊 Баға: {int(s * 100)}%\n💡 AI: {f}", reply_markup=get_dashboard_markup())
+    await state.clear()
 
-    # Егер функция тек score мен feedback қайтарса
-    if isinstance(analysis, tuple) and len(analysis) >= 2:
-        score, feedback = analysis[0], analysis[1]
-        ai_prob = analysis[2] if len(analysis) > 2 else random.uniform(0.1, 0.3)
+@router.message(F.voice | F.audio)
+async def audio_proc(message: Message):
+    status = await message.answer("⏳ Аудио талдануда...")
+    file_id = message.voice.file_id if message.voice else message.audio.file_id
+    file = await bot.get_file(file_id)
+    path = f"temp_{file_id}.ogg"
+    await bot.download_file(file.file_path, path)
+    text = convert_voice_to_text(path)
+    if text != "Қате":
+        s, f, p = safe_analyze(text)
+        send_to_dashboard(message.from_user.id, message.from_user.username, message.from_user.full_name, text, s, f, p)
+        await status.edit_text(f"📝 Текст: {text}\n📊 Баға: {s}\n💡 AI: {f}", reply_markup=get_dashboard_markup())
     else:
-        score, feedback, ai_prob = 0.5, "Талдау қатесі", 0.1
+        await status.edit_text("❌ Аудионы тану мүмкін болмады.")
+    if os.path.exists(path): os.remove(path)
+
+@router.message(F.document)
+async def file_proc(message: Message):
+    if not message.document.file_name.endswith('.docx'):
+        return await message.answer("⚠️ Тек .docx файлын жіберіңіз.")
+    status = await message.answer("⏳ Файл оқылуда...")
+    file = await bot.get_file(message.document.file_id)
+    path = f"temp_{message.document.file_name}"
+    await bot.download_file(file.file_path, path)
+    doc = Document(path)
+    full_text = "\n".join([p.text for p in doc.paragraphs])
+    s, f, p = safe_analyze(full_text)
+    send_to_dashboard(message.from_user.id, message.from_user.username, message.from_user.full_name, full_text, s, f, p)
+    await status.edit_text(f"📄 Файл талданды!\n📊 Баға: {s}\n💡 AI: {f}", reply_markup=get_dashboard_markup())
+    if os.path.exists(path): os.remove(path)
+
+@router.message(F.text)
+async def handle_text(message: Message, state: FSMContext):
+    if await state.get_state() or message.text in ["🚀 Сұхбатты бастау", "📱 Көрсету меню"]: return
+
+    mode = get_user_mode(message.from_user.id)
 
     if mode == "mentor":
-        save_result(user_id, message.text, score, feedback)
-        # Dashboard-қа автоматты түрде жіберу
-        send_to_dashboard(
-            user_id,
-            message.from_user.username,
-            message.from_user.full_name,
-            message.text,
-            score,
-            feedback,
-            ai_prob
+        prompt = (
+            f"Сен техникалық Mentor-сың. Пайдаланушы мына тақырыпты таңдады немесе жауап берді: '{message.text}'. "
+            "ЕШҚАНДАЙ үшінші жақтан талдау немесе кеңес жазба. "
+            "ТЕК ҚАНА пайдаланушының білімін тексеретін 1 нақты техникалық сұрақ қой."
         )
-        await status_msg.edit_text(
-            f"📊 Баға: {score}\n🔍 AI Детектор: {int(ai_prob * 100)}%\n💡 AI: {feedback}",
-            reply_markup=get_dashboard_button()
-        )
+        s, question, p = safe_analyze(prompt)
+        send_to_dashboard(message.from_user.id, message.from_user.username, message.from_user.full_name, message.text,
+                          s, question, p)
+        await message.answer(f"🧠 {question}", reply_markup=get_dashboard_markup())
     else:
-        await status_msg.edit_text(f"🤖 Кеңес:\n{feedback}", reply_markup=get_dashboard_button())
-
+        s, feedback, p = safe_analyze(message.text)
+        await message.answer(f"🤖 AI: {feedback}", reply_markup=get_dashboard_markup())
 
 async def main():
-    print("🚀 Бот іске қосылды (Full Link Menu)!")
     await dp.start_polling(bot)
 
 
