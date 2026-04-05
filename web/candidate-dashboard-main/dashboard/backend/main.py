@@ -1,33 +1,45 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-# Түзету: Егер "cd backend" деп папка ішінде тұрсаң, нүктені алып тастаған дұрыс
-# ОСЫЛАЙ ЖАЗ (басындағы нүктелерді өшір):
 from database import SessionLocal, init_db
 from models import Candidate
 from schemas import BotDataIn, CandidateOut, CandidatesListOut
-from seed_data import seed_candidates
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Барлық IP-ден сұраныс қабылдауға рұқсат беру
+# CORS баптаулары (Фронтенд қосылуы үшін)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Барлық жерден рұқсат
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Мәліметтер базасымен байланыс функциясы
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 @app.post("/api/bot-data")
-def post_bot_data(payload: BotDataIn) -> dict:
+def post_bot_data(payload: BotDataIn):
+    """
+    Телеграм боттан келген деректерді қабылдау және сақтау.
+    """
     with SessionLocal() as db:
-        candidate = db.scalar(
-            select(Candidate).where(Candidate.user_id == payload.user_id)
-        )
+        # Пайдаланушының бұрын тіркелгенін тексереміз
+        stmt = select(Candidate).where(Candidate.user_id == payload.user_id)
+        candidate = db.scalar(stmt)
+
         if candidate is None:
+            # Жаңа кандидат жасау (ai_probability қосылды)
             candidate = Candidate(
                 user_id=payload.user_id,
                 username=payload.username,
@@ -35,26 +47,41 @@ def post_bot_data(payload: BotDataIn) -> dict:
                 answers_text=payload.answers_text,
                 ai_score=payload.ai_score,
                 ai_summary=payload.ai_summary,
+                ai_probability=payload.ai_probability  # Схемадан келетін мән
             )
             db.add(candidate)
         else:
+            # Бар кандидаттың деректерін жаңарту
             candidate.username = payload.username
             candidate.full_name = payload.full_name
             candidate.answers_text = payload.answers_text
             candidate.ai_score = payload.ai_score
             candidate.ai_summary = payload.ai_summary
+            candidate.ai_probability = payload.ai_probability
+
         db.commit()
+        db.refresh(candidate)
         return {"ok": True, "id": candidate.id}
 
+
 @app.get("/api/candidates", response_model=CandidatesListOut)
-def get_candidates() -> CandidatesListOut:
+def get_candidates():
+    """
+    Дашборд үшін барлық кандидаттар тізімін алу.
+    """
     with SessionLocal() as db:
         stmt = select(Candidate).order_by(Candidate.ai_score.desc(), Candidate.id.asc())
         candidates = db.scalars(stmt).all()
-        return CandidatesListOut(candidates=[CandidateOut.model_validate(c) for c in candidates])
+        return CandidatesListOut(
+            candidates=[CandidateOut.model_validate(c) for c in candidates]
+        )
+
 
 @app.get("/api/candidates/{id}", response_model=CandidateOut)
-def get_candidate_by_id(id: int) -> CandidateOut:
+def get_candidate_by_id(id: int):
+    """
+    ID бойынша нақты бір кандидаттың мәліметін алу.
+    """
     with SessionLocal() as db:
         candidate = db.scalar(select(Candidate).where(Candidate.id == id))
         if candidate is None:

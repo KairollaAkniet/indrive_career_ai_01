@@ -1,16 +1,19 @@
 import datetime as dt
 
 from pydantic import BaseModel, ConfigDict, Field
+from datetime import datetime
+from pydantic import BaseModel
+
 
 
 class BotDataIn(BaseModel):
     user_id: int
-    username: str | None = None
-    full_name: str | None = None
+    username: str | None
+    full_name: str
     answers_text: str
-    ai_score: int = Field(ge=0, le=100)
-    ai_summary: str | None = None
-
+    ai_score: int
+    ai_summary: str
+    ai_probability: int
 
 class CandidateOut(BaseModel):
     id: int
@@ -20,9 +23,11 @@ class CandidateOut(BaseModel):
     answers_text: str
     ai_score: int
     ai_summary: str | None
-    created_at: dt.datetime
+    ai_probability: int = 0  # 👈 Осы жолдың бар екеніне көз жеткіз
+    created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class CandidatesListOut(BaseModel):

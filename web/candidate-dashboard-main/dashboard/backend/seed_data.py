@@ -12,10 +12,10 @@ def seed_candidates() -> int:
     Возвращает количество добавленных кандидатов.
     """
     with SessionLocal() as db:
-        # Узнаём, есть ли уже хоть какие-то записи кандидатов.
+
         existing_count = db.scalar(select(func.count()).select_from(Candidate))
         if existing_count and existing_count > 0:
-            # Если данные уже есть — повторно не добавляем.
+
             return 0
 
         candidates_data = [

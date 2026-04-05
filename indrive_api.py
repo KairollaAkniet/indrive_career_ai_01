@@ -27,7 +27,7 @@ load_dotenv()
 API_KEY = os.getenv("INDRIVE_API_KEY")
 URL = "https://llm.alem.ai/v1/chat/completions"
 # СЕНІҢ FastAPI БЭКЕНДІҢНІҢ АДРЕСІ:
-BACKEND_URL = "http://127.0.0.1:8000/api/bot-data"
+BACKEND_URL = "http://0.0.0.0:8000/api/bot-data"
 
 
 def analyze_interview_answer(question, user_answer):
@@ -70,7 +70,7 @@ def analyze_candidate_score(user_text: str):
                 {"role": "user", "content": user_text}
             ]
         }
-        response = requests.post(URL, json=payload, headers=headers, timeout=15)
+        response = requests.post(URL, json=payload, headers=headers, timeout=45)
         if response.status_code == 200:
             result = response.json()
             content = result['choices'][0]['message']['content'].strip()

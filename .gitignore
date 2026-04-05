@@ -1,6 +1,17 @@
-node_modules/
+# Python
 __pycache__/
-.env
+*.py[cod]
 venv/
-.idea/
+.env
+
+*.db
+*.sqlite3
+
+# Node.js
+node_modules/
 dist/
+.eslintcache
+
+# IDE
+.vscode/
+.idea/
