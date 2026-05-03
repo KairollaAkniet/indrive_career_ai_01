@@ -2,7 +2,7 @@ import axios from "axios";
 import type { Candidate, CandidatesListResponse } from "./types";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL || "http://172.20.10.5:8000",
   timeout: 15000,
 });
 

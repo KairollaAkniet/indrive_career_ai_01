@@ -10,10 +10,7 @@ type Props = {
 };
 
 function scoreBadge(score: number) {
-  // Подсветка по правилам из ТЗ:
-  // - если ai_score > 80 — зелёный
-  // - если ai_score < 50 — красный
-  // - иначе — нейтральный
+
   if (score > 80) {
     return "border-green-900/50 bg-green-900/20 text-green-200";
   }

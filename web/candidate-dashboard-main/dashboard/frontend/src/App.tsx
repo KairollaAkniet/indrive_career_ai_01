@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import { Trophy, Users, Loader2, Download, Search, FileText, X } from "lucide-react";
+import axios from 'axios';
 
 
-const API_BASE_URL = "http://192.168.8.230:8000";
+const API_BASE_URL = "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL;
+axios.get(`${import.meta.env.VITE_API_URL}`)
 
 export default function App() {
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -22,7 +25,7 @@ export default function App() {
       });
       if (!response.ok) throw new Error("Серверге қосылу мүмкін болмады");
       const data = await response.json();
-      setCandidates(data.candidates || []);
+      setCandidates(data || []);
     } catch (error) {
       console.error("Жаңарту қатесі:", error);
     } finally {
@@ -37,7 +40,7 @@ export default function App() {
       const response = await fetch(`${API_BASE_URL}/api/candidates?t=${timestamp}`, { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
-        setCandidates(data.candidates || []);
+        setCandidates(data || []);
       }
     } catch (error) {
       console.error("Silent update fail");
